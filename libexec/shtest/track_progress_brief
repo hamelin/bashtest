@@ -1,0 +1,4 @@
+#!/bin/sh
+
+jq --join-output '{ "success": ".", "failure": "F", "error": "E", "timeout": "T" }[ .result ]'
+

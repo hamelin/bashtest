@@ -1,0 +1,15 @@
+#!/bin/bash
+TYPE_LOG="$1"
+
+if [ "$TYPE_LOG" = "json" ]; then
+    jq '.'
+else
+    jq --raw-output \
+        '
+        select( .result != "success" ) |
+        ( if .result = "error" then .signal.name else "" ) as $signal_info |
+        if ( .result != "timeout" ) then .output + "\n\n" else "" as $output |
+        "*** Test case \(.test): \(.result)\( $signal_info ) ***\n\n\( $output )"
+        '
+fi
+

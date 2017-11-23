@@ -1,0 +1,14 @@
+#!/bin/bash
+VERBOSITY="$1"
+NUM_TESTS="$2"
+FILE_OUTPUT="$3"
+HERE=$( dirname $0 )
+
+tee >(
+    if [ $VERBOSITY -eq 1 ]; then
+        "$HERE/track_progress_brief" > "$FILE_OUTPUT"
+    elif [ $VERBOSITY -gt 1 ]; then
+        eval "$HERE/track_progress_long" "$NUM_TESTS" > "$FILE_OUTPUT"
+    fi
+)
+

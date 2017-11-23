@@ -1,0 +1,2 @@
+#!/bin/bash
+nl -s ' ' -w 1 | jq --compact --raw-input '[ splits( "\\s+" ) ] | { "num": .[0], "test": .[1] }'

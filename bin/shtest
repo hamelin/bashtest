@@ -1,5 +1,5 @@
-#!/bin/sh
-DIR_SHTEST_BIN=$( basename $0 )/../lib/shtest.bin
+#!/bin/bash
+DIR_SHTEST_BIN=$( basename $0 )/../libexec/shtest
 VERBOSITY=1
 TIMEOUT=2
 TYPE_LOG=human
@@ -32,100 +32,15 @@ if [ -n $1 ]; then
     DIR_TESTS=$1
 fi
 
-FILE_TESTS=`mktemp -t tests`
-FILE_REPORT=`mktemp -t report`
-trap "rm $FILE_TESTS $FILE_REPORT" EXIT
+DIR_TEMP=`mktemp -d shtest.XXXXXXXX`
+trap "rm -rf DIR_TEMP" EXIT
+PATH_LIST_TESTS=$DIR_TEMP/list_tests
 
-NUM_TESTS=`find "$DIR_TESTS" -type f -perm +400 -print | tee "$FILE_TESTS" | wc -l`
-nl -s ' ' -w 1 "$FILE_TESTS" | (
-    eval $( awk '1{ printf( "NUM=%d;TEST=%s", $1, $2 ) }' )
-    FILE_TEST=`mktemp -t test`
-    FILE_OUTPUT=`mktemp -t output`
-    trap "rm $FILE_TEST $FILE_OUTPUT" EXIT
-    DIR_TEST=`dirname $TEST`
+"$DIR_SHTEST_BIN/find_tests" "$DIR_TESTS" >"$PATH_LIST_TESTS"
+NUM_TESTS=$( wc -l "$PATH_LIST_TESTS" )
+"$DIR_SHTEST_BIN/enum_list_tests" <"$PATH_LIST_TESTS" |
+    "$DIR_SHTEST_BIN/make_test" "$DIR_TEMP" "$TIMEOUT" |
+    "$DIR_SHTEST_BIN/run_test" |
+    "$DIR_SHTEST_BIN/track_progress" $VERBOSITY $NUM_TESTS >( cat ) |
+    "$DIR_SHTEST_BIN/report_results" "$TYPE_LOG"
 
-    echo "#!$SHELL" >"$FILE_TEST"
-    echo "cd $DIR_TEST" >>"$FILE_TEST"
-    if [ -f "$DIR_TEST/setup" ]; then
-        echo "source setup" >>"$FILE_TEST"
-    fi
-    echo "source `basename $TEST`"
-    if [ -f "$DIR_TEST/teardown" ]; then
-        echo "source teardown" >>"$FILE_TEST"
-    fi
-    chmod +x "$FILE_TEST"
-
-    "$FILE_TEST" >"$FILE_OUTPUT" 2>&1 &
-    PID_TEST=$!
-    ( sleep $TIMEOUT; kill -KILL $PID_TEST ) &
-    PID_WATCHDOG=$!
-    wait $PID_TEST
-    RESULT=$?
-
-    STATUS="success"
-    SIGNAL_NAME=
-    if [ $RESULT -gt 128 ]; then
-        SIGNAL_NUM=`dc -e "$RESULT 128 - p"`
-        if [ $SIGNAL_NUM -eq 9 ]; then
-            STATUS="timeout"
-        else
-            STATUS="error"
-            SIGNAL_NAME=`kill -l $SIGNAL_NUM`
-        fi
-    elif [ $RESULT -neq 0 ]; then
-        STATUS="failure"
-    fi
-
-
-    if [ "$STATUS" != "success" ]; then
-        OUTPUT=$( jq -Rs '.' "$FILE_OUTPUT" )
-        cat <<-REPORT >>"$FILE_REPORT"
-        {
-            "test": "$TEST",
-            "type": "$STATUS"
-            $( [ -n "$OUTPUT" ] && echo ", \"output\": \"$OUTPUT\"" )
-            $( [ -n "$SIGNAL_NAME" ] && echo ", \"signal\": { \"num\": $SIGNAL_NUM, \"name\": \"$SIGNAL_NAME\" }" )
-        }
-        REPORT
-    fi
-
-    if [ "$VERBOSITY" -eq 1 ]; then
-        echo -n $( jq -R '{ "success": ".", "error": "E", "failure": "F", "timeout": "T" }[.] // "!"' <<<"$STATUS" )
-    elif [ "$VERBOSITY" -gt 1 ]; then
-        LEN_NUM_TESTS=$( jq -s '.[0] | tostring | length' <<<"$NUM_TESTS" )
-        LEN_TEST_NAME=$( jq -R ".[0] | tostring | length | [ 30, . - ( 20 + $LEN_NUM_TESTS ) ] | max" <<<"$COLUMNS" )
-        MSG_RESULT=$(
-            jq ".[\"$STATUS\"] // \"WHAT?\"" <<-MAP
-                {
-                    "success": "ok      ",
-                    "failure": "FAIL    ",
-                    "error":   "ERROR   ",
-                    "timeout": "TIME OUT"
-                }
-            MAP
-        TEST_SHORT=$( jq -R ".[0:$LEN_TEST_NAME]" <<<"$TEST" )
-        PROGRESS=$( jq "100 * . / $NUM_TESTS" <<<"$NUM" )
-        printf "%${LEN_NUM_TESTS}d  $TEST_SHORT  $MSG_RESULT  %.0g" "$NUM" "$PROGRESS"
-    fi
-)
-
-if [ "$VERBOSITY" -gt 0 ]; then
-    if [ -n $( head -c 1 "$FILE_REPORT" ) ]; then
-        echo "Raised issues:"
-        echo
-    else
-        echo "All tests passed."
-    fi
-fi
-
-if [ "$TYPE_LOG" = "human" ]; then
-    xargs -I JQCODE jq --raw-output JQCODE "$FILE_REPORT" <<-JQ
-        \"*** Test case \\(.test): \\(.type)\" + \
-        if has(\"signal\") then \" [\\(.signal.name)]\" else \"\" end + \
-        \"***\\n\\n\" + \
-        if has(\"output\") then .output + \"\\n\" else \"\" end + \
-        \"\\n\"
-    JQ
-else
-    jq --slurp '.' "$FILE_REPORT"
-fi

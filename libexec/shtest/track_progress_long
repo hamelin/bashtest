@@ -1,0 +1,26 @@
+#!/bin/bash
+NUM_TESTS="$1"
+
+WIDTH=$( bc <<<"$COLUMNS - 2" )
+WIDTH_SEP=2
+WIDTH_NUM=$( jq 'tostring | length' <<<"$NUM_TESTS" )
+WIDTH_RESULT=8
+WIDTH_PROGRESS=4
+WIDTH_TEST_NOM=$( bc <<<"$WIDTH - $WIDTH_NUM - $WIDTH_RESULT - $WIDTH_PROGRESS - $WIDTH_SEP * 3" )
+jq --raw-output \
+    --argjson num_tests $NUM_TESTS \
+    --argjson width $WIDTH \
+    --argjson width_num $WIDTH_NUM \
+    --argjson width_result $WIDTH_RESULT \
+    --argjson width_progress $WIDTH_PROGRESS \
+    --argjson min_test 12 \
+    --argjson width_test_nom $WIDTH_TEST_NOM \
+    --argjson result_map '{ "success": "ok", "failure": "FAIL", "error": "ERROR", "timeout": "TIMEOUT" }' \
+    '" " * $width_sep as $sep |
+     ( .num | tostring ) as $s_num | " " * ( $width_num - ( $num | length ) ) + $s_num as $num |
+     [ $width_test_nom, $min_test ] | max as $width_test | ( .test | length ) as $len_test | 
+     .test[ 0:$width_test ] + " " * ( $width_test - $len_test ) as $test |
+     ( ( 100 * .num / $num_tests ) | floor | tostring | . + "%" ) as $s_progress |
+     " " * ( $width_progress - ( $s_progress | length ) ) + $s_progress as $progress |
+     "\( $num )\( $sep )\( $test \)\( $sep \)\( result_map[ .result ] )\( sep )\( $progress )'
+

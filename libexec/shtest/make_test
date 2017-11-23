@@ -1,0 +1,24 @@
+#!/bin/bash
+DIR_TEMP="$1"
+TIMEOUT="$2"
+
+while read TEST; do
+    PATH_CODE=$( mktemp $DIR_TEMP/test_XXXXXXXX )
+    PATH_TEST=$( jq '.test' <<<"$TEST" )
+    cat >"$PATH_CODE" <<-TEST_CODE
+        #!/bin/bash
+        (
+            cd $( dirname $PATH_TEST )
+            [ -f setup ] && source setup
+            source $( basename $PATH_TEST )
+            RETURN=\$?
+            [ -f teardown ] && source teardown
+            exit \$RETURN
+        ) &
+        PID_TEST=\$!
+        ( sleep $TIMEOUT; kill -KILL \$PID_TEST )
+        wait \$PID_TEST
+    TEST_CODE
+    jq --arg path "$PATH_CODE" '. + { "file": $path }' <<<"$TEST"
+done
+

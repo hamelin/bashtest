@@ -1,0 +1,29 @@
+#!/bin/bash
+
+while read TEST; do
+    PATH_CODE=$( jq '.file' <<<"$TEST" )
+    OUTPUT=$( set -o pipefail; eval "$PATH_CODE" | jq --raw-input --slurp '.' )
+    EXIT_CODE=$?
+    RESULT="success"
+    SIGNAL="{}"
+    if [ $EXIT_CODE -gt 128 ]; then
+        SIGNAL_NUM=$( dc -e "$EXIT_CODE 128 - p" )
+        if [ $SIGNAL_NUM = 9 ]; then
+            RESULT="timeout"
+        else
+            RESULT="error"
+            SIGNAL_NAME=$( kill -l $SIGNAL_NUM )
+            SIGNAL="{ \"signal\": { \"number\": $SIGNAL_NUM, \"name\": $SIGNAL_NAME } }"
+        fi
+    elif [ $EXIT_CODE -neq 0 ]; then
+        RESULT="failure"
+    fi
+    jq \
+        --compact
+        --argjson result "$RESULT" \
+        --argjson signal "$SIGNAL" \
+        --argjson output "$OUTPUT" \
+        '. + { "result": $result, "output": $output } + $signal' \
+        <<<"$TEST"
+done
+
