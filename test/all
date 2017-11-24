@@ -1,6 +1,8 @@
 #!/bin/bash
 cd $( dirname "$0" )
 FILE_FAIL=`mktemp fail.XXXXXXXX`
+trap "rm -f $FILE_FAIL" EXIT
+
 find . -maxdepth 1 -name "*.test" -type f -perm +100 | \
     while read TEST; do
         echo "***  $TEST ***"
