@@ -1,0 +1,24 @@
+#!/bin/bash
+cd $( dirname "$0" )
+FILE_FAIL=`mktemp fail.XXXXXXXX`
+find . -maxdepth 1 -name "*.test" -type f -perm +100 | \
+    while read TEST; do
+        echo "***  $TEST ***"
+        eval "./$TEST"
+        RESULT=$?
+        if [ "$RESULT" -ne "0" ]; then
+            echo "FAIL: " $RESULT
+            echo "$TEST" >> $FILE_FAIL
+        fi
+    done
+
+echo
+if [ $( stat -f %z "$FILE_FAIL" ) -eq "0" ]; then
+    echo "All tests passed."
+else
+    echo "Failures:"
+    echo
+    cat $FILE_FAIL
+    rm -f $FILE_FAIL
+fi
+
