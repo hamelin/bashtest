@@ -1,0 +1,8 @@
+#!/bin/bash
+
+DIR=$( mktemp -d )
+trap "rm -rf $DIR" EXIT
+
+diff - <( ../libexec/shtest/find_tests $DIR ) <<-EMPTY
+EMPTY
+

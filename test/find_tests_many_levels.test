@@ -1,0 +1,17 @@
+#!/bin/bash
+DIR=$( mktemp -d )
+trap "rm -rf $DIR" EXIT
+touch $DIR/test_something $DIR/another_one $DIR/setup $DIR/teardown
+mkdir $DIR/subdir $DIR/subdir/subsub
+touch $DIR/subdir/one_check $DIR/subdir/subsub/sub_check $DIR/subdir/subsub/yet_more $DIR/subdir/subsub/fixture
+chmod +x $DIR/test_something $DIR/another_one \
+    $DIR/subdir/one_check $DIR/subdir/subsub/sub_check $DIR/subdir/subsub/yet_more
+
+diff - <( ../libexec/shtest/find_tests $DIR | sort ) <<-LIST
+$DIR/another_one
+$DIR/subdir/one_check
+$DIR/subdir/subsub/sub_check
+$DIR/subdir/subsub/yet_more
+$DIR/test_something
+LIST
+
