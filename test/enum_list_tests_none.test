@@ -1,0 +1,8 @@
+#!/bin/bash
+source setup_stream_process
+
+../libexec/shtest/enum_list_tests <<-TESTS >"$OUT" &&
+TESTS
+diff - "$OUT" <<-EXPECT
+EXPECT
+

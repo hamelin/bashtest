@@ -1,0 +1,14 @@
+#!/bin/bash
+source setup_stream_process
+
+../libexec/shtest/enum_list_tests <<-TESTS | jq --compact-output --sort-keys '.' >"$OUT" &&
+asdf
+qwer/zxcv
+abcd
+TESTS
+diff - "$OUT" <<-EXPECT
+{"num":1,"test":"asdf"}
+{"num":2,"test":"qwer/zxcv"}
+{"num":3,"test":"abcd"}
+EXPECT
+

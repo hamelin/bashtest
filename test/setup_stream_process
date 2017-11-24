@@ -1,0 +1,3 @@
+OUT=$( mktemp )
+trap "rm -f $OUT" EXIT
+
